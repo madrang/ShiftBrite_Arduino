@@ -13,6 +13,7 @@ License along with this library; if not, write to the Free Software
 Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA*/
 
 #include "ShiftBrite.h"
+#include <SPI.h>
 
 ShiftBrite::ShiftBrite(uint8_t data, uint8_t latch, uint8_t enable, uint8_t clock){
 	datapin = data;
@@ -27,9 +28,19 @@ ShiftBrite::ShiftBrite(uint8_t data, uint8_t latch, uint8_t enable, uint8_t cloc
 	digitalWrite(enablepin, LOW);
 	
 	useSPI = (clockpin == 13 && datapin == 11);
+	//useSPI = false;
 	
 	if(useSPI) {
-		SPCR = (1<<SPE)|(1<<MSTR)|(0<<SPR1)|(0<<SPR0);
+		SPI.begin();
+		SPI.setBitOrder(MSBFIRST);
+		SPI.setDataMode(SPI_MODE0);
+		//SPI.setClockDivider(SPI_CLOCK_DIV2);
+		//Sets the SPI clock to one-quarter the frequency of the system clock (4 Mhz for the boards at 16 MHz).
+		SPI.setClockDivider(SPI_CLOCK_DIV4);
+		//SPI.setClockDivider(SPI_CLOCK_DIV64);
+		
+		//Enabling SPI cause enable pin to be set to high.
+		digitalWrite(enablepin, LOW);
 	} else {
 		pinMode(datapin, OUTPUT);
 		pinMode(clockpin, OUTPUT);
@@ -44,11 +55,10 @@ void ShiftBrite::writeSoft(uint8_t data){
 }
 
 void ShiftBrite::writeSPI(uint8_t data){
-	SPDR = data;
-	while(!(SPSR & (1<<SPIF)));
+	SPI.transfer(data);
 }
 
-//
+/** Write color value to registers. */
 void ShiftBrite::SendColor(uint16_t RedValue, uint16_t GreenValue, uint16_t BlueValue){
 	if(useSPI) {
 		writeSPI(B00 << 6 | BlueValue >> 4);
@@ -63,7 +73,7 @@ void ShiftBrite::SendColor(uint16_t RedValue, uint16_t GreenValue, uint16_t Blue
 	}
 }
 
-// Write to current control registers
+/** Write to current control registers */
 void ShiftBrite::SendCurrent(uint16_t RedCurrent, uint16_t GreenCurrent, uint16_t BlueCurrent){
 	if(useSPI) {
 		writeSPI(B01 << 6 | BlueCurrent >> 4);
@@ -78,7 +88,7 @@ void ShiftBrite::SendCurrent(uint16_t RedCurrent, uint16_t GreenCurrent, uint16_
 	}
 }
 
-// latch data into registers
+/** Latch data into registers */
 void ShiftBrite::LatchData(){
 	delayMicroseconds(15);
 	digitalWrite(latchpin,HIGH);
